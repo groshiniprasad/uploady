@@ -3,15 +3,26 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/groshiniprasad/uploady/receipts"
+	"github.com/lpernett/godotenv"
 )
 
 func main() {
 	r := mux.NewRouter()
 
-	// Create uploads directory
+	r.HandleFunc("/upload", receipts.UploadReceiptImage).Methods("POST")
 
-	log.Println("Server starting on port 8080...")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	// load .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	port := os.Getenv("PORT")
+
+	log.Println("Server starting on port ", port)
+	log.Fatal(http.ListenAndServe(port, r))
 }
