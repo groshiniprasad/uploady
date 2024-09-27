@@ -7,6 +7,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/groshiniprasad/uploady/receipts"
+	"github.com/groshiniprasad/uploady/utils"
+
 	"github.com/lpernett/godotenv"
 )
 
@@ -20,6 +22,8 @@ func main() {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
+
+	utils.CreateUploadsDir()
 
 	port := os.Getenv("PORT")
 

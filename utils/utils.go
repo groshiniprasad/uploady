@@ -2,8 +2,10 @@ package utils
 
 import (
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -45,4 +47,14 @@ func GenerateUniqueFilename(originalFilename string) string {
 	// Generate a unique filename using UUID
 	extension := filepath.Ext(originalFilename)
 	return uuid.New().String() + extension
+}
+
+func CreateUploadsDir() {
+	dir := "./uploads"
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err := os.Mkdir(dir, 0755)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 }
