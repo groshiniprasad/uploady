@@ -25,6 +25,8 @@ func main() {
 	frontendUrl := os.Getenv("FRONTEND_URL")
 
 	r.HandleFunc("/receipts", receipts.UploadReceiptImage).Methods("POST")
+	r.HandleFunc("/receipts", receipts.UploadReceiptImage).Methods("POST")
+
 	// Add other routes here
 
 	c := cors.New(cors.Options{

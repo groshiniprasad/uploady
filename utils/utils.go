@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"io"
 	"log"
 	"mime/multipart"
@@ -14,7 +15,7 @@ import (
 
 const MaxFileSize = 10 << 20 // 10 MB
 
-func ValidateImageFile(file multipart.File, header *multipart.FileHeader) (bool, string) {
+func IsValidImageFile(file multipart.File, header *multipart.FileHeader) (bool, string) {
 	// Check file size
 	if header.Size > MaxFileSize {
 		return false, "File size exceeds the limit (10 MB), please upload a smaller file"
@@ -57,4 +58,16 @@ func CreateUploadsDir() {
 			log.Fatal(err)
 		}
 	}
+}
+
+func RespondWithError(w http.ResponseWriter, code int, message string) {
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+	response, _ := json.Marshal(payload)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	w.Write(response)
 }
