@@ -2,6 +2,7 @@ package configs
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/lpernett/godotenv"
@@ -18,8 +19,13 @@ type Config struct {
 var Envs = initConfig()
 
 func initConfig() Config {
-	godotenv.Load()
+	// Load the .env file and handle the error if it fails
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("Warning: .env file not found, using default environment variables")
+	}
 
+	// Return the configuration struct with environment variables or default values
 	return Config{
 		Port:       getEnv("PORT", "8080"),
 		DBUser:     getEnv("DB_USER", "root"),
@@ -29,11 +35,10 @@ func initConfig() Config {
 	}
 }
 
-// Gets the env by key or fallbacks
+// Gets the env by key or fallbacks to the default value
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
 	}
-
 	return fallback
 }

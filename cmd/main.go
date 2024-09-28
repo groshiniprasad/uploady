@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -30,17 +29,17 @@ func main() {
 	}
 
 	// Initialize DB
-	db, err := db.NewMySQLStorage(cfg)
+	database, err := db.NewMySQLStorage(cfg)
 	if err != nil {
-		log.Fatal("Failed to initialize database: ", err)
+		log.Fatalf("Could not connect to MySQL: %v", err)
 	}
-	defer db.Close()
+	defer database.Close()
+
+	fmt.Println("Database successfully connected!")
 
 	// Initialize DB connection
-	initStorage(db)
-
 	// Setup API server
-	server := api.NewAPIServer(fmt.Sprintf(":%s", configs.Envs.Port), db)
+	server := api.NewAPIServer(fmt.Sprintf(":%s", configs.Envs.Port), database)
 
 	// Start server in a goroutine to allow for graceful shutdown
 	go func() {
@@ -67,14 +66,4 @@ func main() {
 	}
 
 	log.Println("Server gracefully stopped.")
-}
-
-// initStorage pings the DB and ensures it's reachable
-func initStorage(db *sql.DB) {
-	err := db.Ping()
-	if err != nil {
-		log.Fatal("Unable to connect to the database: ", err)
-	}
-
-	log.Println("DB: Successfully connected!")
 }
