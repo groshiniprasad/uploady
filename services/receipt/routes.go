@@ -57,15 +57,22 @@ func (h *Handler) handleCreateReceipt(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the file from the form
-	file, handler, err := r.FormFile("image")
+	file, fileHeader, err := r.FormFile("image")
 	if err != nil {
 		http.Error(w, "Error uploading file: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
+	// Validate the file using the isValidFile function
+	isValid, validationMsg := utils.IsValidImageFile(file, fileHeader)
+	if !isValid {
+		http.Error(w, validationMsg, http.StatusBadRequest)
+		return
+	}
+
 	// Save the image file to disk (or cloud storage)
-	filePath := fmt.Sprintf("./uploads/%s", handler.Filename)
+	filePath := fmt.Sprintf("./uploads/%s", fileHeader.Filename)
 	dst, err := os.Create(filePath)
 	if err != nil {
 		http.Error(w, "Failed to save file: "+err.Error(), http.StatusInternalServerError)
