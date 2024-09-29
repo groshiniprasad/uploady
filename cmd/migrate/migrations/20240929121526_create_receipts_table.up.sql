@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS receipts (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `userId` INT UNSIGNED NOT NULL,
+    `amount` DECIMAL(10, 2) NOT NULL,
+    `description` TEXT,
+    `ìmagePath` VARCHAR(255) NOT NULL,
+    `date` TIMESTAMP NOT NULL,
+    `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (`userId`) REFERENCES users(`id`)
+);
