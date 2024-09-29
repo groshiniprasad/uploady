@@ -61,6 +61,7 @@ type Receipt struct {
 type ReceiptStore interface {
 	GetReceiptByName(name string, userId int) (*User, error)
 	CreateReceipt(Receipt) (int, error)
+	GetReceiptByID(receiptId int, userId int) (*Receipt, error)
 }
 
 type CreateReceiptPayload struct {

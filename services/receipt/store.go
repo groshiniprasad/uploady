@@ -3,6 +3,7 @@ package receipt
 import (
 	"database/sql"
 	"fmt"
+	"log"
 
 	"github.com/groshiniprasad/uploady/types"
 )
@@ -35,6 +36,28 @@ func (s *Store) CreateReceipt(receipt types.Receipt) (int, error) {
 	}
 
 	return int(id), nil
+}
+
+func (s *Store) GetReceiptByID(receiptId int, userId int) (*types.Receipt, error) {
+	// Query the receipts table instead of users
+	query := "SELECT id, userId, name, amount, date, imagePath FROM receipts WHERE id = ? AND userId = ?"
+	row := s.db.QueryRow(query, receiptId, userId)
+	log.Println("Querying the  with query:", row)
+
+	r := new(types.Receipt)
+
+	err := row.Scan(&r.ID, &r.UserID, &r.Name, &r.Amount, &r.Date, &r.ImagePath)
+
+	if err == sql.ErrNoRows {
+		// Handle the case where no rows are returned
+		fmt.Println("No receipt found for the given ID and UserID")
+		return nil, fmt.Errorf("receipt not found")
+	} else if err != nil {
+		fmt.Println("Error scanning row:", err)
+		return nil, err
+	}
+
+	return r, nil
 }
 
 func (s *Store) GetReceiptsByName(receipt types.Receipt) ([]types.Receipt, error) {

@@ -2,6 +2,8 @@ package receipt
 
 import (
 	"fmt"
+	"image"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"os"
@@ -25,9 +27,9 @@ func NewHandler(store types.ReceiptStore, userStore types.UserStore) *Handler {
 
 func (h *Handler) RegisterRoutes(router *mux.Router) {
 	// Routers to get all receipts of a user
-	router.HandleFunc("/receipts", h.handleGetReceipts).Methods(http.MethodGet)
 
 	router.HandleFunc("/receipts/upload", auth.WithJWTAuth(h.handleCreateReceipt, h.userStore)).Methods(http.MethodPost)
+	router.HandleFunc("/receipts/{id}", auth.WithJWTAuth(h.handleGetResizedReceiptsV2, h.userStore)).Methods(http.MethodGet)
 
 }
 
@@ -72,7 +74,8 @@ func (h *Handler) handleCreateReceipt(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Save the image file to disk (or cloud storage)
-	filePath := fmt.Sprintf("./uploads/%s", fileHeader.Filename)
+	filename := utils.GenerateUniqueFilename(fileHeader.Filename)
+	filePath := fmt.Sprintf("./uploads/%s", filename)
 	dst, err := os.Create(filePath)
 	if err != nil {
 		http.Error(w, "Failed to save file: "+err.Error(), http.StatusInternalServerError)
@@ -107,4 +110,57 @@ func (h *Handler) handleCreateReceipt(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handler) handleGetReceipts(w http.ResponseWriter, r *http.Request) {}
+func (h *Handler) handleGetResizedReceiptsV2(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := auth.GetUserIDFromContext(r.Context())
+
+	str, ok := vars["id"]
+	if !ok {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("missing receipt ID"))
+		return
+	}
+
+	receiptID, err := strconv.Atoi(str)
+	if err != nil {
+		utils.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid receipt ID"))
+		return
+	}
+
+	receipt, err := h.store.GetReceiptByID(receiptID, userID)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Open the file
+	file, err := os.Open(receipt.ImagePath)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+	defer file.Close()
+
+	// Decode the image
+	img, _, err := image.Decode(file)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("error decoding image: %v", err))
+		return
+	}
+
+	width, height := utils.GetWidthHeightFromQuery(r)
+
+	// Resize the image
+	resizedImg := utils.ResizeImage(img, width, height)
+
+	// Set the content type
+	w.Header().Set("Content-Type", "image/jpeg")
+
+	// Encode and write the resized image to the response writer
+	err = jpeg.Encode(w, resizedImg, nil)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("error encoding image: %v", err))
+		return
+	}
+}
+
+//func (h *Handler) handleGetReceipts(w http.ResponseWriter, r *http.Request) {}

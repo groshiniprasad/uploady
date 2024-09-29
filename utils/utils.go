@@ -1,13 +1,17 @@
 package utils
 
 import (
+	"image"
 	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+
+	"golang.org/x/image/draw"
 
 	"github.com/google/uuid"
 )
@@ -57,4 +61,31 @@ func CreateUploadsDir() {
 			log.Fatal(err)
 		}
 	}
+}
+
+func ResizeImage(img image.Image, width, height int) image.Image {
+	if width <= 0 || height <= 0 {
+		return img // Return original image if dimensions are invalid
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, width, height))
+	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Over, nil)
+	return dst
+}
+
+// Helper to get width and height from query parameters
+func GetWidthHeightFromQuery(r *http.Request) (int, int) {
+	widthStr := r.URL.Query().Get("width")
+	heightStr := r.URL.Query().Get("height")
+
+	width, err := strconv.Atoi(widthStr)
+	if err != nil || width <= 0 {
+		width = 100 // default width
+	}
+
+	height, err := strconv.Atoi(heightStr)
+	if err != nil || height <= 0 {
+		height = 100 // default height
+	}
+
+	return width, height
 }
