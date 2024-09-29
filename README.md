@@ -24,7 +24,7 @@ The **Receipt Management API** is a backend service that allows users to upload 
 
 1. **Clone the Repository**:
 
-   git clone [https://github.com/yourusername/receipt-management-api.git](https://github.com/groshiniprasad/uploady.git)
+   git clone [uploady rep](https://github.com/groshiniprasad/uploady.git)
    cd uploady
 
 2. **Set Up Environment file**:
@@ -47,42 +47,8 @@ To set up the database and run the application, follow these steps:
     ls
 2. **Set Up the databse**:
 Run the following commands to set up the database and start the server:
+   ```bash
    1. make create-database
    2. make migrate-up
    3. make run
-
-1. **Testing APIS**:
-After setting up the database and running the server, you can test the API endpoints.
-
-1. Register Users
-To register a user, open a new terminal window (make sure the server is running in the other terminal) and use the following curl command:
-
-curl -X POST http://localhost:8080/api/v1/register \
--d '{"FirstName": "RP", "LastName": "Se", "email": "rp@side.com", "password": "password123"}' \
--H "Content-Type: application/json"
-
-2. Login Users
-    To log in and get a JWT token, use the following command:
-    curl -X POST http://localhost:8080/api/v1/login \
--d '{"email": "rp@side.com", "password": "password123"}' \
--H "Content-Type: application/json"
-
-3. Upload a Receipt Image
-To upload a receipt image along with metadata, use the JWT token obtained from the login step. Replace <your_token> with the actual token in the command below:
-curl -X POST http://localhost:8080/api/v1/receipts/upload \
--H "Authorization: Bearer <your_token>" \
--F "Name=Grocery Store Receipt" \
--F "amount=56.99" \
--F "date=2024-10-01" \
--F "image=@/Users/rpg/Documents/Pictures/RPG.jpg"
-
-4. Resize and Download the Image
-To resize and download the image, use the following command. Make sure to replace <your_token> with your actual JWT token:
-curl "http://localhost:8080/api/v1/receipts/1?width=200&height=200" \
--H "Authorization: Bearer <your_token>" \
---output resized_image.jpg && open resized_image.jpg
-
-Notes:
-Make sure your database and server are running before testing any of the APIs.
-Replace <your_token> in the Authorization header with the actual JWT token obtained during the login process.
-You can modify the width and height parameters in the resize request to get different dimensions for the resized image.
+    
