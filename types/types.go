@@ -46,3 +46,28 @@ type LoginUserPayload struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
 }
+
+type Receipt struct {
+	ID          int       `json:"id"`
+	UserID      int       `json:"userID"`
+	Name        string    `json:"name"`
+	Amount      float64   `json:"amount"`
+	Date        time.Time `json:"date"`
+	Description string    `json:"description"`
+	ImagePath   string    `json:"imagePath"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+type ReceiptStore interface {
+	GetReceiptByName(name string, userId int) (*User, error)
+	CreateReceipt(Receipt) (int, error)
+}
+
+type CreateReceiptPayload struct {
+	ID          int       `json:"id"`
+	UserID      int       `json:"userID"`
+	Name        string    `json:"name" validate:"required"`
+	Amount      float64   `json:"amount" validate:"required,gt=0"`
+	Date        time.Time `json:"date" validate:"required"`
+	Description string    `json:"description"`
+}
