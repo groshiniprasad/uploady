@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/groshiniprasad/uploady/services/user"
 )
 
 type APIServer struct {
@@ -15,28 +16,36 @@ type APIServer struct {
 	httpServer *http.Server
 }
 
+// NewAPIServer creates a new instance of APIServer
 func NewAPIServer(addr string, db *sql.DB) *APIServer {
-	server := &APIServer{
+	return &APIServer{
 		addr: addr,
 		db:   db,
 	}
+}
+
+// Run starts the server and listens on the provided address
+func (s *APIServer) Run() error {
+	// Create the router
 	router := mux.NewRouter()
 
-	// Serve static files
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir("static")))
+	// Create a subrouter for API versioning
+	subrouter := router.PathPrefix("/api/v1").Subrouter()
 
-	server.httpServer = &http.Server{
-		Addr:    addr,
+	// Setup user routes
+	userStore := user.NewStore(s.db)
+	userHandler := user.NewHandler(userStore)
+	userHandler.RegisterRoutes(subrouter)
+
+	// Initialize the HTTP server
+	s.httpServer = &http.Server{
+		Addr:    s.addr,
 		Handler: router,
 	}
 
-	return server
-}
-
-func (s *APIServer) Run() error {
 	log.Println("Listening on", s.addr)
 
-	// Start the server
+	// Start the HTTP server
 	if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return err
 	}
