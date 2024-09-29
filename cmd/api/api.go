@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/groshiniprasad/uploady/services/receipt"
 	"github.com/groshiniprasad/uploady/services/user"
 )
 
@@ -36,6 +37,10 @@ func (s *APIServer) Run() error {
 	userStore := user.NewStore(s.db)
 	userHandler := user.NewHandler(userStore)
 	userHandler.RegisterRoutes(subrouter)
+
+	receiptStore := receipt.NewStore(s.db)
+	receiptHandler := receipt.NewHandler(receiptStore, userStore)
+	receiptHandler.RegisterRoutes(subrouter)
 
 	// Initialize the HTTP server
 	s.httpServer = &http.Server{

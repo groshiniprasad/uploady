@@ -14,6 +14,7 @@ import (
 	"github.com/groshiniprasad/uploady/cmd/api"
 	"github.com/groshiniprasad/uploady/configs"
 	"github.com/groshiniprasad/uploady/db"
+	"github.com/groshiniprasad/uploady/utils"
 )
 
 func main() {
@@ -47,6 +48,8 @@ func main() {
 			log.Fatal("Failed to run API server: ", err)
 		}
 	}()
+
+	utils.CreateUploadsDir()
 
 	// Create a channel to listen for interrupt or terminate signals
 	shutdownChan := make(chan os.Signal, 1)
