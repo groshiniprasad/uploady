@@ -1,39 +1,47 @@
 package receipt
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/jpeg"
+	"image/png"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/groshiniprasad/uploady/cache"
 	"github.com/groshiniprasad/uploady/services/auth"
 	"github.com/groshiniprasad/uploady/types"
 	"github.com/groshiniprasad/uploady/utils"
+	"github.com/groshiniprasad/uploady/worker"
 )
 
 type Handler struct {
-	store     types.ReceiptStore
-	userStore types.UserStore
+	store      types.ReceiptStore
+	userStore  types.UserStore
+	cache      *cache.Cache
+	workerPool *worker.WorkerPool
 }
 
-func NewHandler(store types.ReceiptStore, userStore types.UserStore) *Handler {
-	return &Handler{store: store, userStore: userStore}
+func NewHandler(store types.ReceiptStore, userStore types.UserStore, cacheStore *cache.Cache, workerPool *worker.WorkerPool) *Handler {
+	return &Handler{store: store, userStore: userStore, cache: cacheStore, workerPool: workerPool}
 }
 
 func (h *Handler) RegisterRoutes(router *mux.Router) {
 	// Routers to get all receipts of a user
 
 	router.HandleFunc("/receipts/upload", auth.WithJWTAuth(h.handleCreateReceipt, h.userStore)).Methods(http.MethodPost)
-	router.HandleFunc("/receipts/{id}", auth.WithJWTAuth(h.handleGetResizedReceiptsV2, h.userStore)).Methods(http.MethodGet)
+	router.HandleFunc("/receipts/{id}", auth.WithJWTAuth(h.handleGetResizedReceiptsV5, h.userStore)).Methods(http.MethodGet)
 
 }
 
 func (h *Handler) handleCreateReceipt(w http.ResponseWriter, r *http.Request) {
+
 	userID := auth.GetUserIDFromContext(r.Context())
 
 	// Parse the multipart form, limit file size to 10MB
@@ -99,18 +107,22 @@ func (h *Handler) handleCreateReceipt(w http.ResponseWriter, r *http.Request) {
 		ImagePath: filePath, // Save the path where the image is stored
 	}
 
-	_, err = h.store.CreateReceipt(receipt)
+	receiptId, err := h.store.CreateReceipt(receipt)
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
 
+	cacheKey := fmt.Sprintf("user_%d_receipt_%d", userID, receiptId)
+	h.cache.Set(cacheKey, filePath, 5*time.Minute)
 	// Respond with success
 	fmt.Fprintf(w, "Receipt uploaded successfully: %+v\n", receipt)
 
 }
 
-func (h *Handler) handleGetResizedReceiptsV2(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleGetResizedReceiptsV5(w http.ResponseWriter, r *http.Request) {
+	startNow := time.Now()
+
 	vars := mux.Vars(r)
 	userID := auth.GetUserIDFromContext(r.Context())
 
@@ -126,164 +138,109 @@ func (h *Handler) handleGetResizedReceiptsV2(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	receipt, err := h.store.GetReceiptByID(receiptID, userID)
+	// Log cache size for debugging
+	log.Printf("Cache size: %d items", h.cache.Size())
+
+	// Cache key
+	cacheKey := fmt.Sprintf("user_%d_receipt_%d", userID, receiptID)
+	var imagePath string
+
+	// Check if the value is in the cache
+	if filePathValue, found := h.cache.Get(cacheKey); found {
+		// Cache hit
+		log.Printf("Cache hit: %s", cacheKey)
+		imagePath, ok = filePathValue.(string)
+		if !ok {
+			utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("cached value is not a string"))
+			return
+		}
+	} else {
+		// Cache miss
+		log.Printf("Cache miss: %s", cacheKey)
+
+		// Fetch the receipt (heavy task processing happens in worker)
+		receipt, err := h.store.GetReceiptByID(receiptID, userID)
+		if err != nil {
+			utils.WriteError(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		// Store the imagePath in the cache for future requests
+		imagePath = receipt.ImagePath
+		h.cache.Set(cacheKey, imagePath, 5*time.Minute)
+	}
+
+	// Get width and height parameters from the query string
+	width, height := utils.GetWidthHeightFromQuery(r)
+
+	// Prepare payload for the resizing task
+	payload := types.ResizeTaskPayload{
+		ImagePath: imagePath,
+		Width:     width,
+		Height:    height,
+		Response:  w,
+	}
+	// Submit the task to the worker pool and wait for it to complete
+	err = h.workerPool.AddTask(func() error {
+		return ResizeAndServeImageV2(payload, w)
+	})
+
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
 
+	log.Printf("Image resizing completed in %v", time.Since(startNow))
+}
+
+// ResizeAndServeImage performs the actual image resizing and sends the response
+func ResizeAndServeImageV2(payload types.ResizeTaskPayload, w http.ResponseWriter) error {
 	// Open the file
-	file, err := os.Open(receipt.ImagePath)
+	file, err := os.Open(payload.ImagePath)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, err)
-		return
+		log.Printf("Failed to open image file: %v\n", err)
+		return fmt.Errorf("failed to open image file")
 	}
 	defer file.Close()
 
 	// Decode the image
-	img, _, err := image.Decode(file)
+	img, format, err := image.Decode(file)
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("error decoding image: %v", err))
-		return
+		log.Printf("Error decoding image: %v\n", err)
+		return fmt.Errorf("error decoding image")
 	}
-
-	width, height := utils.GetWidthHeightFromQuery(r)
 
 	// Resize the image
-	resizedImg := utils.ResizeImage(img, width, height)
+	resizedImg := utils.ResizeImage(img, payload.Width, payload.Height)
 
-	// Set the content type
-	w.Header().Set("Content-Type", "image/jpeg")
+	// Write the resized image to a buffer first
+	buf := new(bytes.Buffer)
 
-	// Encode and write the resized image to the response writer
-	err = jpeg.Encode(w, resizedImg, nil)
+	// Set the appropriate content type based on the image format
+	switch format {
+	case "jpeg", "jpg":
+		w.Header().Set("Content-Type", "image/jpeg")
+		err = jpeg.Encode(buf, resizedImg, nil) // Encode the image to the buffer
+	case "png":
+		w.Header().Set("Content-Type", "image/png")
+		err = png.Encode(buf, resizedImg) // PNG encoder, ensure you import "image/png"
+	default:
+		log.Printf("Unsupported image format: %s", format)
+		return fmt.Errorf("unsupported image format")
+	}
+
 	if err != nil {
-		utils.WriteError(w, http.StatusInternalServerError, fmt.Errorf("error encoding image: %v", err))
-		return
-	}
-}
-
-// handleGetResizedReceiptsV2 handles retrieving a receipt image, resizing it, and returning the resized image.
-func (h *Handler) handleGetResizedReceiptsV3(w http.ResponseWriter, r *http.Request) {
-	// Extract user ID from JWT token context
-	userID := auth.GetUserIDFromContext(r.Context())
-
-	// Extract receipt ID from URL variables
-	vars := mux.Vars(r)
-	receiptIDStr, ok := vars["id"]
-	if !ok {
-		http.Error(w, "missing receipt ID", http.StatusBadRequest)
-		return
+		log.Printf("Error encoding image: %v\n", err)
+		return fmt.Errorf("error encoding image")
 	}
 
-	// Convert receipt ID to integer
-	receiptID, err := strconv.Atoi(receiptIDStr)
+	// Now write the buffer to the response writer
+	_, err = buf.WriteTo(w) // Write the buffer content to the ResponseWriter
 	if err != nil {
-		http.Error(w, "invalid receipt ID", http.StatusBadRequest)
-		return
+		log.Printf("Error writing image to response: %v\n", err)
+		return fmt.Errorf("error writing image to response")
 	}
 
-	// Fetch the receipt concurrently
-	receiptChan := make(chan *types.Receipt)
-	errChan := make(chan error)
-
-	go func() {
-		receipt, err := h.store.GetReceiptByID(receiptID, userID)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		receiptChan <- receipt
-	}()
-
-	// Receive the result
-	var receipt *types.Receipt
-	select {
-	case err := <-errChan:
-		http.Error(w, fmt.Sprintf("failed to retrieve receipt: %v", err), http.StatusInternalServerError)
-		return
-	case receipt = <-receiptChan:
-	}
-
-	// Open the image file from disk concurrently
-	fileChan := make(chan *os.File)
-	fileErrChan := make(chan error)
-
-	go func() {
-		file, err := os.Open(receipt.ImagePath)
-		if err != nil {
-			fileErrChan <- err
-			return
-		}
-		fileChan <- file
-	}()
-
-	// Receive the result
-	var file *os.File
-	select {
-	case err := <-fileErrChan:
-		http.Error(w, fmt.Sprintf("failed to open image file: %v", err), http.StatusInternalServerError)
-		return
-	case file = <-fileChan:
-	}
-	defer file.Close()
-
-	// Decode the image file concurrently
-	imgChan := make(chan image.Image)
-	decodeErrChan := make(chan error)
-
-	go func() {
-		img, _, err := image.Decode(file)
-		if err != nil {
-			decodeErrChan <- err
-			return
-		}
-		imgChan <- img
-	}()
-
-	// Receive the result
-	var img image.Image
-	select {
-	case err := <-decodeErrChan:
-		http.Error(w, fmt.Sprintf("failed to decode image: %v", err), http.StatusInternalServerError)
-		return
-	case img = <-imgChan:
-	}
-
-	// Get width and height from the query parameters, default to 100x100
-	width, height := utils.GetWidthHeightFromQuery(r)
-
-	// Resize the image concurrently
-	resizeChan := make(chan image.Image)
-	go func() {
-		resizedImg := utils.ResizeImage(img, width, height)
-		resizeChan <- resizedImg
-	}()
-
-	// Receive the resized image
-	var resizedImg image.Image
-	select {
-	case resizedImg = <-resizeChan:
-	}
-
-	// Set the content type to JPEG
-	w.Header().Set("Content-Type", "image/jpeg")
-
-	// Encode and write the resized image to the response concurrently
-	encodeErrChan := make(chan error)
-	go func() {
-		err = jpeg.Encode(w, resizedImg, nil)
-		encodeErrChan <- err
-	}()
-
-	// Check encoding error
-	select {
-	case err = <-encodeErrChan:
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to encode image: %v", err), http.StatusInternalServerError)
-			return
-		}
-	}
+	log.Printf("Image resized and served successfully")
+	return nil
 }
-
-//func (h *Handler) handleGetReceipts(w http.ResponseWriter, r *http.Request) {}

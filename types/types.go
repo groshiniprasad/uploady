@@ -1,6 +1,7 @@
 package types
 
 import (
+	"net/http"
 	"time"
 )
 
@@ -71,4 +72,24 @@ type CreateReceiptPayload struct {
 	Amount      float64   `json:"amount" validate:"required,gt=0"`
 	Date        time.Time `json:"date" validate:"required"`
 	Description string    `json:"description"`
+}
+
+// Task represents a heavy task for the worker pool
+type Task struct {
+	Request  *http.Request
+	Response http.ResponseWriter
+	JobType  string // Defines what kind of heavy task (e.g., image processing)
+	Payload  interface{}
+}
+
+type WorkerPool struct {
+	taskQueue chan Task
+	quit      chan bool
+}
+
+type ResizeTaskPayload struct {
+	ImagePath string
+	Width     int
+	Height    int
+	Response  http.ResponseWriter
 }

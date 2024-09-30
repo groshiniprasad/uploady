@@ -29,11 +29,16 @@ func (s *Store) CreateReceipt(receipt types.Receipt) (int, error) {
 		return 0, fmt.Errorf("failed to create receipt: %w", err)
 	}
 
+	// Check if the receipt was successfully created
+	log.Println("Receipt created successfully")
+
 	// Get the last inserted ID
 	id, err := res.LastInsertId()
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve last insert ID: %w", err)
 	}
+
+	log.Printf("Receipt ID: %d\n", id)
 
 	return int(id), nil
 }

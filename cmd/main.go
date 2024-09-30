@@ -40,7 +40,7 @@ func main() {
 
 	// Initialize DB connection
 	// Setup API server
-	server := api.NewAPIServer(fmt.Sprintf(":%s", configs.Envs.Port), database)
+	server := api.NewAPIServer(fmt.Sprintf(":%s", configs.Envs.Port), database, 9, 9)
 
 	// Start server in a goroutine to allow for graceful shutdown
 	go func() {
