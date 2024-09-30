@@ -47,7 +47,6 @@ func (s *Store) GetReceiptByID(receiptId int, userId int) (*types.Receipt, error
 	// Query the receipts table instead of users
 	query := "SELECT id, userId, name, amount, date, imagePath FROM receipts WHERE id = ? AND userId = ?"
 	row := s.db.QueryRow(query, receiptId, userId)
-	log.Println("Querying the  with query:", row)
 
 	r := new(types.Receipt)
 
