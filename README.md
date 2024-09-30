@@ -28,14 +28,7 @@ The **Receipt Management API** is a backend service that allows users to upload 
    cd uploady
 
 2. **Set Up Environment file**:
-    PORT=
-    DB_USER=
-    DB_PASSWORD=
-    DB_HOST=
-    DB_PORT=
-    DB_NAME=
-    JWT_SECRET=
-    JWTExpirationInSeconds=
+    Update your .env files
 ## 3. Set Up Database
 
 To set up the database and run the application, follow these steps:

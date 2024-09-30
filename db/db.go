@@ -18,6 +18,11 @@ func NewMySQLStorage(cfg mysql.Config) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to create MySQL connection: %w", err)
 	}
 
+	// // Configure the connection pool settings (optional, but recommended)
+	// db.SetMaxOpenConns(25) // Maximum number of open connections to the database
+	// db.SetMaxIdleConns(25) // Maximum number of idle connections in the pool
+	// db.SetConnMaxLifetime(5 * time.Minute)
+
 	// Test the connection by pinging the database
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to connect to MySQL database: %w", err)

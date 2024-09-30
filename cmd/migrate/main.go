@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 )
 
 func main() {
+
 	// MySQL connection config
 	cfg := mysqlDriver.Config{
 		User:                 configs.Envs.DBUser,
@@ -25,6 +27,14 @@ func main() {
 		Net:                  "tcp",
 		AllowNativePasswords: true,
 		ParseTime:            true,
+
+		TLS: &tls.Config{
+			InsecureSkipVerify: true, // Insecure TLS (use only in dev)
+		},
+		// Timeout:          5 * time.Second,  // 5 second connection timeout
+		// ReadTimeout:      10 * time.Second, // 10 second read timeout
+		// WriteTimeout:     10 * time.Second, // 10 second write timeout
+		// MaxAllowedPacket: 4 * 1024 * 1024,  // Max packet size (4MB)
 	}
 
 	// Open the database connection

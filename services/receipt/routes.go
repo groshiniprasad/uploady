@@ -163,4 +163,127 @@ func (h *Handler) handleGetResizedReceiptsV2(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// handleGetResizedReceiptsV2 handles retrieving a receipt image, resizing it, and returning the resized image.
+func (h *Handler) handleGetResizedReceiptsV3(w http.ResponseWriter, r *http.Request) {
+	// Extract user ID from JWT token context
+	userID := auth.GetUserIDFromContext(r.Context())
+
+	// Extract receipt ID from URL variables
+	vars := mux.Vars(r)
+	receiptIDStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "missing receipt ID", http.StatusBadRequest)
+		return
+	}
+
+	// Convert receipt ID to integer
+	receiptID, err := strconv.Atoi(receiptIDStr)
+	if err != nil {
+		http.Error(w, "invalid receipt ID", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch the receipt concurrently
+	receiptChan := make(chan *types.Receipt)
+	errChan := make(chan error)
+
+	go func() {
+		receipt, err := h.store.GetReceiptByID(receiptID, userID)
+		if err != nil {
+			errChan <- err
+			return
+		}
+		receiptChan <- receipt
+	}()
+
+	// Receive the result
+	var receipt *types.Receipt
+	select {
+	case err := <-errChan:
+		http.Error(w, fmt.Sprintf("failed to retrieve receipt: %v", err), http.StatusInternalServerError)
+		return
+	case receipt = <-receiptChan:
+	}
+
+	// Open the image file from disk concurrently
+	fileChan := make(chan *os.File)
+	fileErrChan := make(chan error)
+
+	go func() {
+		file, err := os.Open(receipt.ImagePath)
+		if err != nil {
+			fileErrChan <- err
+			return
+		}
+		fileChan <- file
+	}()
+
+	// Receive the result
+	var file *os.File
+	select {
+	case err := <-fileErrChan:
+		http.Error(w, fmt.Sprintf("failed to open image file: %v", err), http.StatusInternalServerError)
+		return
+	case file = <-fileChan:
+	}
+	defer file.Close()
+
+	// Decode the image file concurrently
+	imgChan := make(chan image.Image)
+	decodeErrChan := make(chan error)
+
+	go func() {
+		img, _, err := image.Decode(file)
+		if err != nil {
+			decodeErrChan <- err
+			return
+		}
+		imgChan <- img
+	}()
+
+	// Receive the result
+	var img image.Image
+	select {
+	case err := <-decodeErrChan:
+		http.Error(w, fmt.Sprintf("failed to decode image: %v", err), http.StatusInternalServerError)
+		return
+	case img = <-imgChan:
+	}
+
+	// Get width and height from the query parameters, default to 100x100
+	width, height := utils.GetWidthHeightFromQuery(r)
+
+	// Resize the image concurrently
+	resizeChan := make(chan image.Image)
+	go func() {
+		resizedImg := utils.ResizeImage(img, width, height)
+		resizeChan <- resizedImg
+	}()
+
+	// Receive the resized image
+	var resizedImg image.Image
+	select {
+	case resizedImg = <-resizeChan:
+	}
+
+	// Set the content type to JPEG
+	w.Header().Set("Content-Type", "image/jpeg")
+
+	// Encode and write the resized image to the response concurrently
+	encodeErrChan := make(chan error)
+	go func() {
+		err = jpeg.Encode(w, resizedImg, nil)
+		encodeErrChan <- err
+	}()
+
+	// Check encoding error
+	select {
+	case err = <-encodeErrChan:
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to encode image: %v", err), http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
 //func (h *Handler) handleGetReceipts(w http.ResponseWriter, r *http.Request) {}
