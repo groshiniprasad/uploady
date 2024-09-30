@@ -50,8 +50,7 @@ func IsValidImageFile(file multipart.File, header *multipart.FileHeader) (bool, 
 
 func GenerateUniqueFilename(originalFilename string) string {
 	// Generate a unique filename using UUID
-	extension := filepath.Ext(originalFilename)
-	return uuid.New().String() + extension
+	return uuid.New().String() + originalFilename
 }
 
 func CreateUploadsDir() {

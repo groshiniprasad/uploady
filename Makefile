@@ -37,3 +37,6 @@ create-database:
 		mysql -u $(DB_USER) -p$(DB_PASSWORD) -h $(DB_HOST) -e "CREATE DATABASE IF NOT EXISTS \`$(DB_NAME)\`"; \
 		echo "Database '$(DB_NAME)' created successfully"; \
 	fi
+# Run migrations
+migrate-up-docker:
+	docker-compose run --rm api migrate -path /app/migrations -database "mysql://root:mypassword@tcp(db:3306)/uploady" up

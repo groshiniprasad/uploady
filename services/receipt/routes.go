@@ -83,7 +83,12 @@ func (h *Handler) handleCreateReceipt(w http.ResponseWriter, r *http.Request) {
 
 	// Save the image file to disk (or cloud storage)
 	filename := utils.GenerateUniqueFilename(fileHeader.Filename)
-	filePath := fmt.Sprintf("./uploads/%s", filename)
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Failed to get current working directory: %v", err)
+	}
+	filePath := fmt.Sprintf("%s/uploads/%s", cwd, filename)
+
 	dst, err := os.Create(filePath)
 	if err != nil {
 		http.Error(w, "Failed to save file: "+err.Error(), http.StatusInternalServerError)
