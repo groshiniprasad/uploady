@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"image"
 	"io"
 	"log"
@@ -63,13 +64,34 @@ func CreateUploadsDir() {
 	}
 }
 
-func ResizeImage(img image.Image, width, height int) image.Image {
+func ResizeImage(img image.Image, width, height int) (image.Image, error) {
 	if width <= 0 || height <= 0 {
-		return img // Return original image if dimensions are invalid
+		return nil, fmt.Errorf("Dimensions Invalid") // Return original image if dimensions are invalid
 	}
 	dst := image.NewRGBA(image.Rect(0, 0, width, height))
 	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Over, nil)
-	return dst
+	return dst, nil
+}
+
+// CropExactPart crops a specific rectangular part of the image based on the given coordinates (x, y, width, height)
+func CropExactPart(img image.Image, x, y, width, height int) (image.Image, error) {
+	// Get the bounds of the original image
+	bounds := img.Bounds()
+
+	// Ensure that the coordinates and dimensions are within the bounds of the original image
+	if x < 0 || y < 0 || x+width > bounds.Dx() || y+height > bounds.Dy() {
+		return nil, fmt.Errorf("crop area exceeds image bounds")
+	}
+
+	// Define the cropping rectangle based on the coordinates and dimensions
+	cropRect := image.Rect(x, y, x+width, y+height)
+
+	// Create a new image with the dimensions of the cropped area
+	croppedImg := image.NewRGBA(cropRect)
+
+	draw.Draw(croppedImg, croppedImg.Bounds(), img, image.Point{x, y}, draw.Src)
+
+	return croppedImg, nil
 }
 
 // Helper to get width and height from query parameters
@@ -88,4 +110,22 @@ func GetWidthHeightFromQuery(r *http.Request) (int, int) {
 	}
 
 	return width, height
+}
+
+// Helper to get X and Y from query parameters
+func GetXYFromQuery(r *http.Request) (*int, *int) {
+	xStr := r.URL.Query().Get("x")
+	yStr := r.URL.Query().Get("y")
+
+	var x, y *int
+
+	if xVal, err := strconv.Atoi(xStr); err == nil && xVal > 0 {
+		x = &xVal // Valid x
+	}
+
+	if yVal, err := strconv.Atoi(yStr); err == nil && yVal > 0 {
+		y = &yVal // Valid y
+	}
+
+	return x, y
 }

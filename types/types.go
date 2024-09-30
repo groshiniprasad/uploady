@@ -93,3 +93,12 @@ type ResizeTaskPayload struct {
 	Height    int
 	Response  http.ResponseWriter
 }
+
+type CropTaskPayload struct {
+	ImagePath string
+	Width     int
+	Height    int
+	Response  http.ResponseWriter
+	X         int
+	Y         int
+}

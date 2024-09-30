@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/go-sql-driver/mysql"
 	"github.com/groshiniprasad/uploady/cmd/api"
 	"github.com/groshiniprasad/uploady/configs"
@@ -47,6 +49,11 @@ func main() {
 		if err := server.Run(); err != nil && err != http.ErrServerClosed {
 			log.Fatal("Failed to run API server: ", err)
 		}
+	}()
+
+	go func() {
+		log.Println("Starting pprof on 127.0.0.1:6060")
+		http.ListenAndServe("127.0.0.1:6060", nil)
 	}()
 
 	utils.CreateUploadsDir()
