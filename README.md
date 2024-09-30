@@ -38,7 +38,7 @@ The **Receipt Management API** is a backend service that allows users to upload 
     JWTExpirationInSeconds=
 ## 3. Set Up Database
 
-To set up the database and run the application, follow these steps:
+To set up the database and run the application,(Also please ensure your database is running. ) follow these steps:
 
 1. **Navigate to the project directory**:
    ```bash
