@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS receipts (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `userId` INT UNSIGNED NOT NULL,
+    `userId` UNSIGNED INT UNSIGNED NOT NULL,
     `name` VARCHAR(255) NOT NULL,
     `amount` DECIMAL(10, 2) NOT NULL,
     `description` TEXT,
