@@ -44,4 +44,12 @@ Run the following commands to set up the database and start the server:
    1. make create-database
    2. make migrate-up
    3. make run
-    
+   
+ Else you could set up the docker containers, by running
+   ```bash
+   docker-compose up --build
+
+3. **To Run the testcases**:
+    ```bash
+   1. make test
+
