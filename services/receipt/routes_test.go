@@ -123,8 +123,14 @@ func TestReceiptServiceHandlers(t *testing.T) {
 		assert.Contains(t, rr.Body.String(), "test.jpg")
 
 		// Check if the upload directory exists
-		uploadDir := "/uploads"
-
+		uploadDir := "./uploads"
+		if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
+			err := os.Mkdir(uploadDir, os.ModePerm)
+			if err != nil {
+				t.Fatal(err)
+				return
+			}
+		}
 		// Check if the file has been created in the upload directory
 		expectedFile := fmt.Sprintf("%s/test.jpg", uploadDir)
 		_, err = os.Stat(expectedFile)
@@ -185,7 +191,6 @@ func (m *mockUserStore) GetUserByEmail(email string) (*types.User, error) {
 func (m *mockUserStore) GetUserByID(id int) (*types.User, error) {
 	panic("unimplemented")
 }
-
 func (m *mockUserStore) GetReceiptByID(userId int, receiptId int) error {
 	return nil
 }
