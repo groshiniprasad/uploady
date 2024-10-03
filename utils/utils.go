@@ -1,14 +1,18 @@
 package utils
 
 import (
-	"encoding/json"
+	"fmt"
+	"image"
 	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+
+	"golang.org/x/image/draw"
 
 	"github.com/google/uuid"
 )
@@ -46,8 +50,7 @@ func IsValidImageFile(file multipart.File, header *multipart.FileHeader) (bool, 
 
 func GenerateUniqueFilename(originalFilename string) string {
 	// Generate a unique filename using UUID
-	extension := filepath.Ext(originalFilename)
-	return uuid.New().String() + extension
+	return uuid.New().String() + originalFilename
 }
 
 func CreateUploadsDir() {
@@ -60,14 +63,76 @@ func CreateUploadsDir() {
 	}
 }
 
-func RespondWithError(w http.ResponseWriter, code int, message string) {
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+func ResizeImage(img image.Image, width, height int) (image.Image, error) {
+	if width <= 0 || height <= 0 {
+		return nil, fmt.Errorf("Dimensions Invalid") // Return original image if dimensions are invalid
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, width, height))
+	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Over, nil)
+	return dst, nil
 }
 
-func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
-	response, _ := json.Marshal(payload)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	w.Write(response)
+// CropExactPart crops a specific rectangular part of the image based on the given coordinates (x, y, width, height)
+func CropExactPart(img image.Image, x, y, width, height int) (image.Image, error) {
+	// Get the bounds of the original image
+	bounds := img.Bounds()
+
+	// Ensure that the coordinates and dimensions are within the bounds of the original image
+	if x < 0 || y < 0 || x+width > bounds.Dx() || y+height > bounds.Dy() {
+		return nil, fmt.Errorf("crop area exceeds image bounds")
+	}
+
+	// Define the cropping rectangle based on the coordinates and dimensions
+	cropRect := image.Rect(x, y, x+width, y+height)
+
+	// Create a new image with the dimensions of the cropped area
+	croppedImg := image.NewRGBA(cropRect)
+
+	draw.Draw(croppedImg, croppedImg.Bounds(), img, image.Point{x, y}, draw.Src)
+
+	return croppedImg, nil
+}
+
+// Helper to get width and height from query parameters
+func GetWidthHeightFromQuery(r *http.Request) (int, int) {
+	widthStr := r.URL.Query().Get("width")
+	heightStr := r.URL.Query().Get("height")
+
+	width, err := strconv.Atoi(widthStr)
+	if err != nil || width <= 0 {
+		width = 100 // default width
+	}
+
+	height, err := strconv.Atoi(heightStr)
+	if err != nil || height <= 0 {
+		height = 100 // default height
+	}
+
+	return width, height
+}
+
+// Helper to get X and Y from query parameters
+func GetXYFromQuery(r *http.Request) (*int, *int) {
+	xStr := r.URL.Query().Get("x")
+	yStr := r.URL.Query().Get("y")
+
+	var x, y *int
+
+	if xVal, err := strconv.Atoi(xStr); err == nil && xVal > 0 {
+		x = &xVal // Valid x
+	}
+
+	if yVal, err := strconv.Atoi(yStr); err == nil && yVal > 0 {
+		y = &yVal // Valid y
+	}
+
+	return x, y
+}
+
+func GetFormatFromRequest(r *http.Request) string {
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "jpeg" // Default to jpeg if no format is specified
+	}
+	return format
 }

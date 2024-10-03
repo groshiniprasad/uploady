@@ -1,0 +1,41 @@
+version: '3'
+services:
+
+  db:
+    image: mysql:8.0
+    healthcheck:
+      test: "mysqladmin ping -h localhost"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: mypassword
+      MYSQL_DATABASE: uploady
+
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    restart: on-failure
+    volumes:
+      - .:/go/src/api
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: mypassword
+      DB_NAME: uploady
+    depends_on:
+      db:
+        condition: service_healthy
+    links:
+      - db
+
+volumes:
+  db_data:
