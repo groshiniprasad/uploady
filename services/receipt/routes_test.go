@@ -22,8 +22,8 @@ func TestReceiptServiceHandlers(t *testing.T) {
 
 	receiptStore := &mockReceiptStore{}
 	userStore := &mockUserStore{}
-	cache := &cache.Cache{}
-	workerPool := &worker.WorkerPool{} // Assuming worker.WorkerPool is a struct, otherwise use a proper mock implementation
+	cache := cache.NewCache()
+	workerPool := worker.NewWorkerPool(5, 10) // Assuming worker.WorkerPool is a struct, otherwise use a proper mock implementation
 	handler := NewHandler(receiptStore, userStore, cache, workerPool)
 
 	t.Run("should fail if the receipt ID is not a number", func(t *testing.T) {
@@ -138,7 +138,17 @@ func TestReceiptServiceHandlers(t *testing.T) {
 	})
 
 	t.Run("should handle get receipt by ID", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodGet, "/receipt/42?width=200&height=200", nil)
+		req, err := http.NewRequest(http.MethodGet, "/receipt/1?width=50&height=50", nil)
+		// Create the mock stores and services
+		receiptStore := &mockReceiptStore{}
+		userStore := &mockUserStore{}
+		workerPool := worker.NewWorkerPool(3, 100)
+
+		// Initialize the handler
+		handler := NewHandler(receiptStore, userStore, cache, workerPool)
+
+		// Create the request and response recorder
+		req, err = http.NewRequest(http.MethodGet, "/receipt/1?width=200&height=200", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -146,14 +156,20 @@ func TestReceiptServiceHandlers(t *testing.T) {
 		rr := httptest.NewRecorder()
 		router := mux.NewRouter()
 
+		// Register the route with the handler
 		router.HandleFunc("/receipt/{receiptID}", handler.handleGetResizedReceiptsV5).Methods(http.MethodGet)
 
+		// Serve the request
 		router.ServeHTTP(rr, req)
-
+		assert.NoError(t, err)
+		// Assert the status code
 		if rr.Code != http.StatusOK {
 			t.Errorf("expected status code %d, got %d", http.StatusOK, rr.Code)
 		}
+		// Optionally, check dimensions of the resized image
+
 	})
+
 }
 
 type mockUserStore struct{}
@@ -166,7 +182,13 @@ func (m *mockReceiptStore) CreateReceipt(types.Receipt) (int, error) {
 
 // GetReceiptByID implements types.ReceiptStore.
 func (m *mockReceiptStore) GetReceiptByID(receiptId int, userId int) (*types.Receipt, error) {
-	panic("unimplemented")
+	return &types.Receipt{
+		ID:        receiptId,
+		UserID:    userId,
+		Name:      "Test Receipt",
+		Amount:    123.45,
+		ImagePath: "./uploads/test.jpg", // Path to a test image file
+	}, nil
 }
 
 // GetReceiptByName implements types.ReceiptStore.
