@@ -128,3 +128,11 @@ func GetXYFromQuery(r *http.Request) (*int, *int) {
 
 	return x, y
 }
+
+func GetFormatFromRequest(r *http.Request) string {
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "jpeg" // Default to jpeg if no format is specified
+	}
+	return format
+}

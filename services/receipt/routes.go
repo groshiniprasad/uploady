@@ -345,7 +345,7 @@ func (h *Handler) handleGetResizedReceiptsImgCaching(w http.ResponseWriter, r *h
 	}
 
 	cacheKey := fmt.Sprintf("user_%d_receipt_%d", userID, receiptID)
-	var img image.Image
+	var img image.Imagée
 
 	// Check if the image is already cached
 	if cachedImg, found := h.cache.Get(cacheKey); found {
@@ -390,7 +390,7 @@ func resizeAndSendImage(img image.Image, w http.ResponseWriter, r *http.Request)
 	var buf bytes.Buffer
 
 	// Determine the format of the image (JPEG, PNG, etc.)
-	format := getFormatFromRequest(r)
+	format := utils.GetFormatFromRequest(r)
 
 	// Set the appropriate content type
 	if format == "jpeg" {
@@ -434,14 +434,6 @@ func (h *Handler) readImageFromDisk(path string) (image.Image, error) {
 		return nil, fmt.Errorf("error decoding image: %v", err)
 	}
 	return img, nil
-}
-
-func getFormatFromRequest(r *http.Request) string {
-	format := r.URL.Query().Get("format")
-	if format == "" {
-		format = "jpeg" // Default to jpeg if no format is specified
-	}
-	return format
 }
 
 //func (h *Handler) handleGetReceipts(w http.ResponseWriter, r *http.Request) {}
